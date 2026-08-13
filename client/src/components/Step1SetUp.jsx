@@ -8,8 +8,7 @@ import {
     FaChartLine,
 } from "react-icons/fa";
 import { useState } from 'react';
-import axios from "axios"
-import { ServerUrl } from '../App';
+import api from '../utils/api';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
 function Step1SetUp({ onStart }) {
@@ -35,7 +34,7 @@ function Step1SetUp({ onStart }) {
         formdata.append("resume", resumeFile)
 
         try {
-            const result = await axios.post(ServerUrl + "/api/interview/resume", formdata, { withCredentials: true })
+            const result = await api.post("/api/interview/resume", formdata)
 
             console.log(result.data)
 
@@ -57,7 +56,7 @@ function Step1SetUp({ onStart }) {
     const handleStart = async () => {
         setLoading(true)
         try {
-           const result = await axios.post(ServerUrl + "/api/interview/generate-questions" , {role, experience, mode , resumeText, projects, skills } , {withCredentials:true}) 
+           const result = await api.post("/api/interview/generate-questions" , {role, experience, mode , resumeText, projects, skills }) 
            console.log(result.data)
            if(userData){
             dispatch(setUserData({...userData , credits:result.data.creditsLeft}))

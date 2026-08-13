@@ -1,12 +1,13 @@
 import React from 'react'
-import { FaArrowLeft } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
 import { motion } from "motion/react"
-import { buildStyles, CircularProgressbar } from 'react-circular-progressbar';
+import { CircularProgressbar } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import BackButton from './BackButton';
+import { circularProgressStyles } from '../utils/progressbarStyles';
+import { getPerformanceSummary } from '../utils/performanceSummary';
 
 function Step3Report({ report }) {
   if (!report) {
@@ -16,7 +17,6 @@ function Step3Report({ report }) {
       </div>
     );
   }
-  const navigate = useNavigate()
   const {
     finalScore = 0,
     confidence = 0,
@@ -36,19 +36,7 @@ function Step3Report({ report }) {
     { label: "Correctness", value: correctness },
   ];
 
-  let performanceText = "";
-  let shortTagline = "";
-
-  if (finalScore >= 8) {
-    performanceText = "Ready for job opportunities.";
-    shortTagline = "Excellent clarity and structured responses.";
-  } else if (finalScore >= 5) {
-    performanceText = "Needs minor improvement before interviews.";
-    shortTagline = "Good foundation, refine articulation.";
-  } else {
-    performanceText = "Significant improvement required.";
-    shortTagline = "Work on clarity and confidence.";
-  }
+  const { performanceText, shortTagline, advice } = getPerformanceSummary(finalScore);
 
   const score = finalScore;
   const percentage = (score / 10) * 100;
@@ -107,19 +95,6 @@ function Step3Report({ report }) {
   currentY += 45;
 
   // ================= ADVICE =================
-  let advice = "";
-
-  if (finalScore >= 8) {
-    advice =
-      "Excellent performance. Maintain confidence and structure. Continue refining clarity and supporting answers with strong real-world examples.";
-  } else if (finalScore >= 5) {
-    advice =
-      "Good foundation shown. Improve clarity and structure. Practice delivering concise, confident answers with stronger supporting examples.";
-  } else {
-    advice =
-      "Significant improvement required. Focus on structured thinking, clarity, and confident delivery. Practice answering aloud regularly.";
-  }
-
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(220);
   doc.roundedRect(margin, currentY, contentWidth, 35, 4, 4);
@@ -175,9 +150,7 @@ function Step3Report({ report }) {
     <div className='min-h-screen bg-linear-to-br from-gray-50 to-green-50 px-4 sm:px-6 lg:px-10 py-8'>
       <div className='mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         <div className='md:mb-10 w-full flex items-start gap-4 flex-wrap'>
-          <button
-            onClick={() => navigate("/history")}
-            className='mt-1 p-3 rounded-full bg-white shadow hover:shadow-md transition'><FaArrowLeft className='text-gray-600' /></button>
+          <BackButton to="/history" />
 
           <div>
             <h1 className='text-3xl font-bold flex-nowrap text-gray-800'>
@@ -209,12 +182,7 @@ function Step3Report({ report }) {
               <CircularProgressbar
                 value={percentage}
                 text={`${score}/10`}
-                styles={buildStyles({
-                  textSize: "18px",
-                  pathColor: "#10b981",
-                  textColor: "#ef4444",
-                  trailColor: "#e5e7eb",
-                })}
+                styles={circularProgressStyles("18px")}
               />
             </div>
 

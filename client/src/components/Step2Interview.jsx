@@ -7,8 +7,7 @@ import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 import { useState } from 'react'
 import { useRef } from 'react'
 import { useEffect } from 'react'
-import axios from "axios"
-import { ServerUrl } from '../App'
+import api from '../utils/api'
 import { BsArrowRight } from 'react-icons/bs'
 
 function Step2Interview({ interviewData, onFinish }) {
@@ -251,13 +250,13 @@ function Step2Interview({ interviewData, onFinish }) {
     setIsSubmitting(true)
 
     try {
-      const result = await axios.post(ServerUrl + "/api/interview/submit-answer", {
+      const result = await api.post("/api/interview/submit-answer", {
         interviewId,
         questionIndex: currentIndex,
         answer,
         timeTaken:
           currentQuestion.timeLimit - timeLeft,
-      } , {withCredentials:true})
+      })
 
       setFeedback(result.data.feedback)
       speakText(result.data.feedback)
@@ -291,7 +290,7 @@ setIsSubmitting(false)
     stopMic()
     setIsMicOn(false)
     try {
-      const result = await axios.post(ServerUrl+ "/api/interview/finish" , { interviewId} , {withCredentials:true})
+      const result = await api.post("/api/interview/finish" , { interviewId})
 
       console.log(result.data)
       onFinish(result.data)

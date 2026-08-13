@@ -1,6 +1,5 @@
 import React from 'react'
 import Navbar from '../components/Navbar'
-import { useSelector } from 'react-redux'
 import { motion } from "motion/react";
 import {
   BsRobot,
@@ -11,8 +10,8 @@ import {
 } from "react-icons/bs";
 import { HiSparkles } from "react-icons/hi";
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import AuthModel from '../components/AuthModel';
+import useAuthGate from '../hooks/useAuthGate';
 import hrImg from "../assets/HR.png";
 import techImg from "../assets/tech.png";
 import confidenceImg from "../assets/confi.png";
@@ -25,8 +24,7 @@ import Footer from '../components/Footer';
 
 
 function Home() {
-  const { userData } = useSelector((state) => state.user)
-  const [showAuth, setShowAuth] = useState(false);
+  const { showAuth, setShowAuth, requireAuth } = useAuthGate()
   const navigate = useNavigate()
   return (
     <div className='min-h-screen bg-[#f3f3f3] flex flex-col'>
@@ -73,13 +71,7 @@ function Home() {
 
             <div className='flex flex-wrap justify-center gap-4 mt-10'>
               <motion.button
-                onClick={() => {
-                  if (!userData) {
-                    setShowAuth(true)
-                    return;
-                  }
-                  navigate("/interview")
-                }}
+                onClick={() => requireAuth(() => navigate("/interview"))}
                 whileHover={{ opacity: 0.9, scale: 1.03 }}
                 whileTap={{ opacity: 1, scale: 0.98 }}
                 className='bg-black text-white px-10 py-3 rounded-full hover:opacity-90 transition shadow-md'>
@@ -88,13 +80,7 @@ function Home() {
               </motion.button>
 
               <motion.button
-                onClick={() => {
-                  if (!userData) {
-                    setShowAuth(true)
-                    return;
-                  }
-                  navigate("/history")
-                }}
+                onClick={() => requireAuth(() => navigate("/history"))}
                 whileHover={{ opacity: 0.9, scale: 1.03 }}
                 whileTap={{ opacity: 1, scale: 0.98 }}
                 className='border border-gray-300 px-10 py-3 rounded-full hover:bg-gray-100 transition'>

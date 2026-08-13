@@ -1,12 +1,11 @@
 import React from 'react'
-import { BsRobot } from "react-icons/bs";
+import BrandLogo from '../components/BrandLogo';
 import { IoSparkles } from "react-icons/io5";
 import { motion } from "motion/react"
 import { FcGoogle } from "react-icons/fc";
 import { signInWithPopup } from 'firebase/auth';
 import { auth, provider } from '../utils/firebase';
-import axios from 'axios';
-import { ServerUrl } from '../App';
+import api from '../utils/api';
 import { useDispatch } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
 function Auth({isModel = false}) {
@@ -18,7 +17,7 @@ function Auth({isModel = false}) {
             let User = response.user
             let name = User.displayName
             let email = User.email
-            const result = await axios.post(ServerUrl + "/api/auth/google" , {name , email} , {withCredentials:true})
+            const result = await api.post("/api/auth/google" , {name , email})
             dispatch(setUserData(result.data))
             
 
@@ -43,13 +42,7 @@ function Auth({isModel = false}) {
         ${isModel ? "max-w-md p-8 rounded-3xl" : "max-w-lg p-12 rounded-[32px]"}
         bg-white shadow-2xl border border-gray-200
       `}>
-            <div className='flex items-center justify-center gap-3 mb-6'>
-                <div className='bg-black text-white p-2 rounded-lg'>
-                    <BsRobot size={18}/>
-
-                </div>
-                <h2 className='font-semibold text-lg'>InterviewIQ.AI</h2>
-            </div>
+            <BrandLogo className='justify-center mb-6'/>
 
             <h1 className='text-2xl md:text-3xl font-semibold text-center leading-snug mb-4'>
                 Continue with

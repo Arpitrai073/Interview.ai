@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from "axios"
-import { ServerUrl } from '../App'
-import { FaArrowLeft } from 'react-icons/fa'
+import api from '../utils/api'
+import BackButton from '../components/BackButton'
 function InterviewHistory() {
     const [interviews, setInterviews] = useState([])
     const navigate = useNavigate()
@@ -10,7 +9,7 @@ function InterviewHistory() {
     useEffect(() => {
         const getMyInterviews = async () => {
             try {
-                const result = await axios.get(ServerUrl + "/api/interview/get-interview", { withCredentials: true })
+                const result = await api.get("/api/interview/get-interview")
 
                 setInterviews(result.data)
 
@@ -30,9 +29,7 @@ function InterviewHistory() {
             <div className='w-[90vw] lg:w-[70vw] max-w-[90%] mx-auto'>
 
                 <div className='mb-10 w-full flex items-start gap-4 flex-wrap'>
-                    <button
-                        onClick={() => navigate("/")}
-                        className='mt-1 p-3 rounded-full bg-white shadow hover:shadow-md transition'><FaArrowLeft className='text-gray-600' /></button>
+                    <BackButton to="/" />
 
                     <div>
                         <h1 className='text-3xl font-bold flex-nowrap text-gray-800'>
