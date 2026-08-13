@@ -2,8 +2,9 @@ import Payment from "../models/payment.model.js";
 import User from "../models/user.model.js";
 import razorpay from "../services/razorpay.service.js";
 import crypto from "crypto"
+import ApiError from "../utils/ApiError.js";
 
-export const createOrder = async (req,res) => {
+export const createOrder = async (req,res,next) => {
     try {
         const {planId, amount, credits} = req.body;
           if (!amount || !credits) {
@@ -16,7 +17,13 @@ export const createOrder = async (req,res) => {
       receipt: `receipt_${Date.now()}`,
     };
 
-    const order = await razorpay.orders.create(options)
+    let order
+    try {
+      order = await razorpay.orders.create(options)
+    } catch (error) {
+      console.error("Razorpay order creation failed:", error?.error || error)
+      throw new ApiError(502, "Could not reach the payment provider. Please try again.", { cause: error })
+    }
 
      await Payment.create({
       userId: req.userId,
@@ -31,16 +38,24 @@ export const createOrder = async (req,res) => {
 
     
     } catch (error) {
-         return res.status(500).json({message:`failed to create Razorpay order ${error}`})
+         return next(error)
     }
 }
 
 
-export const verifyPayment = async (req,res) => {
+export const verifyPayment = async (req,res,next) => {
     try {
         const {razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature} = req.body
+
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        throw new ApiError(400, "Missing payment verification details.")
+      }
+
+      if (!process.env.RAZORPAY_KEY_SECRET) {
+        throw new Error("RAZORPAY_KEY_SECRET is not configured")
+      }
 
       const body = razorpay_order_id + "|" + razorpay_payment_id;
 
@@ -61,6 +76,10 @@ export const verifyPayment = async (req,res) => {
       return res.status(404).json({ message: "Payment not found" });
     }
 
+    if (payment.userId.toString() !== req.userId) {
+      throw new ApiError(403, "This payment does not belong to you.")
+    }
+
     if (payment.status === "paid") {
       return res.json({ message: "Already processed" });
     }
@@ -75,13 +94,17 @@ export const verifyPayment = async (req,res) => {
       $inc: { credits: payment.credits }
     },{new:true});
 
-    res.json({
+    if (!updatedUser) {
+      throw new ApiError(404, "Paid user account no longer exists. Please contact support.")
+    }
+
+    return res.json({
       success: true,
       message: "Payment verified and credits added",
       user: updatedUser,
     });
 
     } catch (error) {
-         return res.status(500).json({message:`failed to verify Razorpay payment ${error}`})
+         return next(error)
     }
 }

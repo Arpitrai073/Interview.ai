@@ -6,10 +6,12 @@ import axios from 'axios';
 import { ServerUrl } from '../App';
 import { useDispatch } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
+import { getErrorMessage } from '../utils/apiError';
 function Pricing() {
   const navigate = useNavigate()
   const [selectedPlan, setSelectedPlan] = useState("free");
   const [loadingPlan, setLoadingPlan] = useState(null);
+  const [error, setError] = useState("");
   const dispatch = useDispatch()
 
   const plans = [
@@ -59,8 +61,13 @@ function Pricing() {
 
 
   const handlePayment = async (plan) => {
+    setError("")
     try {
       setLoadingPlan(plan.id)
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay checkout script failed to load")
+      }
 
       const amount =  
       plan.id === "basic" ? 100 :
@@ -82,12 +89,25 @@ function Pricing() {
       order_id: result.data.id,
 
       handler:async function (response) {
-        const verifypay = await axios.post(ServerUrl + "/api/payment/verify" ,response , {withCredentials:true})
-        dispatch(setUserData(verifypay.data.user))
+        try {
+          const verifypay = await axios.post(ServerUrl + "/api/payment/verify" ,response , {withCredentials:true})
+          dispatch(setUserData(verifypay.data.user))
 
           alert("Payment Successful 🎉 Credits Added!");
           navigate("/")
-
+        } catch (error) {
+          // The money may already be captured, so never fail silently here.
+          console.error("Payment verification failed:", error)
+          setError(getErrorMessage(
+            error,
+            "We could not confirm your payment. If you were charged, contact support with your payment id."
+          ))
+        }
+      },
+      modal:{
+        ondismiss: function () {
+          setError("Payment was cancelled before it completed.")
+        },
       },
       theme:{
         color: "#10b981",
@@ -96,12 +116,19 @@ function Pricing() {
       }
 
       const rzp = new window.Razorpay(options)
+
+      rzp.on("payment.failed", function (response) {
+        console.error("Razorpay reported a failed payment:", response?.error)
+        setError(response?.error?.description || "The payment failed. Please try again.")
+      })
+
       rzp.open()
 
-      setLoadingPlan(null);
     } catch (error) {
-     console.log(error)
-     setLoadingPlan(null);
+      console.error("Failed to start payment:", error)
+      setError(getErrorMessage(error, "Could not start the payment. Please try again."))
+    } finally {
+      setLoadingPlan(null);
     }
   }
 
@@ -126,6 +153,12 @@ function Pricing() {
         </div>
       </div>
 
+
+      {error && (
+        <p role='alert' className='max-w-3xl mx-auto mb-10 text-center text-red-600 bg-red-50 border border-red-200 rounded-2xl px-6 py-4'>
+          {error}
+        </p>
+      )}
 
       <div className='grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto'>
 

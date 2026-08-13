@@ -1,10 +1,16 @@
 import genToken from "../config/token.js"
 import User from "../models/user.model.js"
+import ApiError from "../utils/ApiError.js"
 
 
-export const googleAuth = async (req,res) => {
+export const googleAuth = async (req,res,next) => {
     try {
         const {name , email} = req.body
+
+        if(!name || !email){
+            throw new ApiError(400 , "Name and email are required.")
+        }
+
         let user = await User.findOne({email})
         if(!user){
             user = await User.create({
@@ -14,7 +20,7 @@ export const googleAuth = async (req,res) => {
         }
         let token = await genToken(user._id)
         res.cookie("token" , token , {
-            http:true,
+            httpOnly:true,
             secure:true,
             sameSite:"none",
             maxAge:7 * 24 * 60 * 60 * 1000
@@ -25,17 +31,21 @@ export const googleAuth = async (req,res) => {
 
 
     } catch (error) {
-        return res.status(500).json({message:`Google auth error ${error}`})
+        return next(error)
     }
     
 }
 
-export const logOut = async (req,res) => {
+export const logOut = async (req,res,next) => {
     try {
-        await res.clearCookie("token")
+        res.clearCookie("token" , {
+            httpOnly:true,
+            secure:true,
+            sameSite:"none"
+        })
         return res.status(200).json({message:"LogOut Successfully"})
     } catch (error) {
-         return res.status(500).json({message:`Logout error ${error}`})
+        return next(error)
     }
     
 }

@@ -12,6 +12,7 @@ import axios from "axios"
 import { ServerUrl } from '../App';
 import { useDispatch, useSelector } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
+import { getErrorMessage } from '../utils/apiError';
 function Step1SetUp({ onStart }) {
     const {userData}= useSelector((state)=>state.user)
     const dispatch = useDispatch()
@@ -25,19 +26,20 @@ function Step1SetUp({ onStart }) {
     const [resumeText, setResumeText] = useState("");
     const [analysisDone, setAnalysisDone] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
+    const [resumeError, setResumeError] = useState("");
+    const [startError, setStartError] = useState("");
 
 
     const handleUploadResume = async () => {
         if (!resumeFile || analyzing) return;
         setAnalyzing(true)
+        setResumeError("")
 
         const formdata = new FormData()
         formdata.append("resume", resumeFile)
 
         try {
             const result = await axios.post(ServerUrl + "/api/interview/resume", formdata, { withCredentials: true })
-
-            console.log(result.data)
 
             setRole(result.data.role || "");
             setExperience(result.data.experience || "");
@@ -46,27 +48,28 @@ function Step1SetUp({ onStart }) {
             setResumeText(result.data.resumeText || "");
             setAnalysisDone(true);
 
-            setAnalyzing(false);
-
         } catch (error) {
-            console.log(error)
+            console.error("Resume analysis failed:", error)
+            setResumeError(getErrorMessage(error, "Could not analyze the resume. Please try again."))
+        } finally {
             setAnalyzing(false);
         }
     }
 
     const handleStart = async () => {
         setLoading(true)
+        setStartError("")
         try {
            const result = await axios.post(ServerUrl + "/api/interview/generate-questions" , {role, experience, mode , resumeText, projects, skills } , {withCredentials:true}) 
-           console.log(result.data)
            if(userData){
             dispatch(setUserData({...userData , credits:result.data.creditsLeft}))
            }
-           setLoading(false)
            onStart(result.data)
 
         } catch (error) {
-            console.log(error)
+            console.error("Failed to start interview:", error)
+            setStartError(getErrorMessage(error, "Could not start the interview. Please try again."))
+        } finally {
             setLoading(false)
         }
     }
@@ -211,6 +214,12 @@ function Step1SetUp({ onStart }) {
 
                         )}
 
+                        {resumeError && (
+                            <p role='alert' className='text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3'>
+                                {resumeError}
+                            </p>
+                        )}
+
                         {analysisDone && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -248,6 +257,12 @@ function Step1SetUp({ onStart }) {
                             </motion.div>
                         )}
 
+
+                        {startError && (
+                            <p role='alert' className='text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3'>
+                                {startError}
+                            </p>
+                        )}
 
                         <motion.button
                         onClick={handleStart}

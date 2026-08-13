@@ -22,7 +22,10 @@ function App() {
         const result = await axios.get(ServerUrl + "/api/user/current-user", {withCredentials:true})
         dispatch(setUserData(result.data))
       } catch (error) {
-        console.log(error)
+        // A 401 just means nobody is signed in yet; anything else is a real failure.
+        if (error?.response?.status !== 401) {
+          console.error("Failed to load current user:", error)
+        }
         dispatch(setUserData(null))
       }
     }

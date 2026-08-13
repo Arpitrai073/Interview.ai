@@ -10,6 +10,7 @@ import { useEffect } from 'react'
 import axios from "axios"
 import { ServerUrl } from '../App'
 import { BsArrowRight } from 'react-icons/bs'
+import { getErrorMessage } from '../utils/apiError'
 
 function Step2Interview({ interviewData, onFinish }) {
   const { interviewId, questions, userName } = interviewData;
@@ -29,6 +30,7 @@ function Step2Interview({ interviewData, onFinish }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voiceGender, setVoiceGender] = useState("female");
   const [subtitle, setSubtitle] = useState("");
+  const [error, setError] = useState("");
 
 
   const videoRef = useRef(null);
@@ -113,12 +115,12 @@ function Step2Interview({ interviewData, onFinish }) {
       };
 
 
-      utterance.onend = () => {
+      const finish = () => {
         videoRef.current?.pause();
-        videoRef.current.currentTime = 0;
+        if (videoRef.current) {
+          videoRef.current.currentTime = 0;
+        }
         setIsAIPlaying(false);
-
-
 
         if (isMicOn) {
           startMic();
@@ -127,6 +129,16 @@ function Step2Interview({ interviewData, onFinish }) {
           setSubtitle("");
           resolve();
         }, 300);
+      };
+
+      utterance.onend = finish;
+
+      // Without this the promise never settles and the interview stalls silently.
+      utterance.onerror = (event) => {
+        if (event.error !== "interrupted" && event.error !== "canceled") {
+          console.error("Speech synthesis failed:", event.error);
+        }
+        finish();
       };
 
 
@@ -226,7 +238,12 @@ function Step2Interview({ interviewData, onFinish }) {
     if (recognitionRef.current && !isAIPlaying) {
       try {
         recognitionRef.current.start();
-      } catch { }
+      } catch (error) {
+        // start() throws if recognition is already running, which is harmless.
+        if (error?.name !== "InvalidStateError") {
+          console.error("Could not start speech recognition:", error);
+        }
+      }
     }
   };
 
@@ -249,6 +266,7 @@ function Step2Interview({ interviewData, onFinish }) {
     if (isSubmitting) return;
     stopMic()
     setIsSubmitting(true)
+    setError("")
 
     try {
       const result = await axios.post(ServerUrl + "/api/interview/submit-answer", {
@@ -261,16 +279,18 @@ function Step2Interview({ interviewData, onFinish }) {
 
       setFeedback(result.data.feedback)
       speakText(result.data.feedback)
-      setIsSubmitting(false)
     } catch (error) {
-console.log(error)
-setIsSubmitting(false)
+      console.error("Failed to submit answer:", error)
+      setError(getErrorMessage(error, "Could not submit your answer. Please try again."))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleNext =async () => {
     setAnswer("");
     setFeedback("");
+    setError("");
 
     if (currentIndex + 1 >= questions.length) {
       finishInterview();
@@ -290,13 +310,14 @@ setIsSubmitting(false)
   const finishInterview = async () => {
     stopMic()
     setIsMicOn(false)
+    setError("")
     try {
       const result = await axios.post(ServerUrl+ "/api/interview/finish" , { interviewId} , {withCredentials:true})
 
-      console.log(result.data)
       onFinish(result.data)
     } catch (error) {
-      console.log(error)
+      console.error("Failed to finish interview:", error)
+      setError(getErrorMessage(error, "Could not generate your report. Please try again."))
     }
   }
 
@@ -305,7 +326,7 @@ setIsSubmitting(false)
     if (isIntroPhase) return;
     if (!currentQuestion) return;
 
-    if (timeLeft === 0 && !isSubmitting && !feedback) {
+    if (timeLeft === 0 && !isSubmitting && !feedback && !error) {
       submitAnswer()
     }
   }, [timeLeft]);
@@ -411,6 +432,17 @@ setIsSubmitting(false)
             value={answer}
             className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800" />
 
+
+          {error && (
+            <div role='alert' className='mt-6 flex items-center justify-between gap-4 bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl'>
+              <p className='text-sm font-medium'>{error}</p>
+              <button
+                onClick={() => (feedback ? finishInterview() : submitAnswer())}
+                className='shrink-0 bg-red-600 text-white text-sm px-4 py-2 rounded-xl hover:opacity-90 transition'>
+                Retry
+              </button>
+            </div>
+          )}
 
          {!feedback ? ( <div className='flex items-center gap-4 mt-6'>
             <motion.button

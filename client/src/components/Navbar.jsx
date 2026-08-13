@@ -10,6 +10,7 @@ import axios from 'axios';
 import { ServerUrl } from '../App';
 import { setUserData } from '../redux/userSlice';
 import AuthModel from './AuthModel';
+import { getErrorMessage } from '../utils/apiError';
 function Navbar() {
     const {userData} = useSelector((state)=>state.user)
     const [showCreditPopup,setShowCreditPopup] = useState(false)
@@ -17,8 +18,10 @@ function Navbar() {
     const navigate = useNavigate()
     const dispatch = useDispatch()
     const [showAuth, setShowAuth] = useState(false);
+    const [logoutError, setLogoutError] = useState("");
 
     const handleLogout = async () => {
+        setLogoutError("")
         try {
             await axios.get(ServerUrl + "/api/auth/logout" , {withCredentials:true})
             dispatch(setUserData(null))
@@ -27,7 +30,8 @@ function Navbar() {
             navigate("/")
 
         } catch (error) {
-            console.log(error)
+            console.error("Logout failed:", error)
+            setLogoutError(getErrorMessage(error, "Could not log out. Please try again."))
         }
     }
   return (
@@ -91,6 +95,10 @@ function Navbar() {
                             className='w-full text-left text-sm py-2 flex items-center gap-2 text-red-500'>
                                 <HiOutlineLogout size={16}/>
                                 Logout</button>
+
+                            {logoutError && (
+                                <p role='alert' className='text-xs text-red-600 mt-1'>{logoutError}</p>
+                            )}
                         </div>
                     )}
                 </div>
