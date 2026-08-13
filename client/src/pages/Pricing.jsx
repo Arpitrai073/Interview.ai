@@ -62,14 +62,8 @@ function Pricing() {
     try {
       setLoadingPlan(plan.id)
 
-      const amount =  
-      plan.id === "basic" ? 100 :
-      plan.id === "pro" ? 500 : 0;
-
       const result = await axios.post(ServerUrl + "/api/payment/order" , {
         planId: plan.id,
-        amount: amount,
-        credits: plan.credits,
       },{withCredentials:true})
       
 

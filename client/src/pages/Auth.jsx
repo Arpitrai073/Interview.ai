@@ -15,10 +15,8 @@ function Auth({isModel = false}) {
     const handleGoogleAuth = async () => {
         try {
             const response = await signInWithPopup(auth,provider)
-            let User = response.user
-            let name = User.displayName
-            let email = User.email
-            const result = await axios.post(ServerUrl + "/api/auth/google" , {name , email} , {withCredentials:true})
+            const idToken = await response.user.getIdToken()
+            const result = await axios.post(ServerUrl + "/api/auth/google" , {idToken} , {withCredentials:true})
             dispatch(setUserData(result.data))
             
 

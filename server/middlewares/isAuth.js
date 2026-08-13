@@ -3,15 +3,16 @@ import jwt from "jsonwebtoken"
 
 const isAuth = async (req,res,next) => {
     try {
-        let {token} = req.cookies
+        const {token} = req.cookies
 
         if(!token){
-            return res.status(400).json({message:"user does not have a token"})
+            return res.status(401).json({message:"Authentication required"})
         }
+
         const verifyToken = jwt.verify(token , process.env.JWT_SECRET)
-        
-        if(!verifyToken){
-            return res.status(400).json({message:"user does not have a valid token"})
+
+        if(!verifyToken?.userId){
+            return res.status(401).json({message:"Invalid token"})
         }
         req.userId = verifyToken.userId
 
@@ -19,7 +20,8 @@ const isAuth = async (req,res,next) => {
    
 
     } catch (error) {
-        return res.status(500).json({message:`isAuth error ${error}`})
+        console.error("isAuth error:", error.message)
+        return res.status(401).json({message:"Invalid or expired token"})
     }
     
 }
