@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { FaArrowLeft, FaCheckCircle } from 'react-icons/fa'
+import { FaCheckCircle } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
 import { motion } from "motion/react";
-import axios from 'axios';
-import { ServerUrl } from '../App';
+import api from '../utils/api';
+import BackButton from '../components/BackButton';
 import { useDispatch } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
 function Pricing() {
@@ -66,11 +66,11 @@ function Pricing() {
       plan.id === "basic" ? 100 :
       plan.id === "pro" ? 500 : 0;
 
-      const result = await axios.post(ServerUrl + "/api/payment/order" , {
+      const result = await api.post("/api/payment/order" , {
         planId: plan.id,
         amount: amount,
         credits: plan.credits,
-      },{withCredentials:true})
+      })
       
 
       const options = {
@@ -82,7 +82,7 @@ function Pricing() {
       order_id: result.data.id,
 
       handler:async function (response) {
-        const verifypay = await axios.post(ServerUrl + "/api/payment/verify" ,response , {withCredentials:true})
+        const verifypay = await api.post("/api/payment/verify" ,response)
         dispatch(setUserData(verifypay.data.user))
 
           alert("Payment Successful 🎉 Credits Added!");
@@ -112,9 +112,7 @@ function Pricing() {
 
       <div className='max-w-6xl mx-auto mb-14 flex items-start gap-4'>
 
-        <button onClick={() => navigate("/")} className='mt-2 p-3 rounded-full bg-white shadow hover:shadow-md transition'>
-          <FaArrowLeft className='text-gray-600' />
-        </button>
+        <BackButton to="/" className='mt-2' />
 
         <div className="text-center w-full">
           <h1 className="text-4xl font-bold text-gray-800">

@@ -30,3 +30,10 @@ export const askAi = async (messages) => {
 
     }
 }
+
+export const buildMessages = (systemPrompt, userContent) => ([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userContent },
+])
+
+export const askAiJson = async (messages) => JSON.parse(await askAi(messages))
