@@ -3,19 +3,27 @@ import { useNavigate } from 'react-router-dom'
 import axios from "axios"
 import { ServerUrl } from '../App'
 import { FaArrowLeft } from 'react-icons/fa'
+import { getErrorMessage } from '../utils/apiError'
 function InterviewHistory() {
     const [interviews, setInterviews] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState("")
     const navigate = useNavigate()
 
     useEffect(() => {
         const getMyInterviews = async () => {
+            setLoading(true)
+            setError("")
             try {
                 const result = await axios.get(ServerUrl + "/api/interview/get-interview", { withCredentials: true })
 
                 setInterviews(result.data)
 
             } catch (error) {
-                console.log(error)
+                console.error("Failed to load interview history:", error)
+                setError(getErrorMessage(error, "Could not load your interview history."))
+            } finally {
+                setLoading(false)
             }
 
         }
@@ -46,7 +54,22 @@ function InterviewHistory() {
                 </div>
 
 
-                {interviews.length === 0 ?
+                {loading ?
+                    <div className='bg-white p-10 rounded-2xl shadow text-center'>
+                        <p className='text-gray-500'>Loading your interviews...</p>
+                    </div>
+
+                    : error ?
+                    <div role='alert' className='bg-white p-10 rounded-2xl shadow text-center'>
+                        <p className='text-red-600 mb-4'>{error}</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className='bg-emerald-600 text-white px-5 py-2 rounded-xl hover:opacity-90 transition'>
+                            Try again
+                        </button>
+                    </div>
+
+                    : interviews.length === 0 ?
                     <div className='bg-white p-10 rounded-2xl shadow text-center'>
                         <p className='text-gray-500'>
                             No interviews found. Start your first interview.

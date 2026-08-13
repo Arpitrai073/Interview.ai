@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { motion } from "motion/react"
@@ -9,6 +9,9 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
 function Step3Report({ report }) {
+  const navigate = useNavigate()
+  const [pdfError, setPdfError] = useState("")
+
   if (!report) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -16,7 +19,7 @@ function Step3Report({ report }) {
       </div>
     );
   }
-  const navigate = useNavigate()
+
   const {
     finalScore = 0,
     confidence = 0,
@@ -55,6 +58,7 @@ function Step3Report({ report }) {
 
 
   const downloadPDF = () => {
+  try {
   const doc = new jsPDF("p", "mm", "a4");
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -169,6 +173,11 @@ function Step3Report({ report }) {
 
 
   doc.save("AI_Interview_Report.pdf");
+  setPdfError("");
+  } catch (error) {
+    console.error("Failed to generate the report PDF:", error);
+    setPdfError("Could not generate the PDF. Please try again.");
+  }
 };
 
   return (
@@ -190,7 +199,13 @@ function Step3Report({ report }) {
           </div>
         </div>
 
-        <button onClick={downloadPDF} className='bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl shadow-md transition-all duration-300 font-semibold text-sm sm:text-base text-nowrap'>Download PDF</button>
+        <div className='flex flex-col items-end gap-2'>
+          <button onClick={downloadPDF} className='bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl shadow-md transition-all duration-300 font-semibold text-sm sm:text-base text-nowrap'>Download PDF</button>
+
+          {pdfError && (
+            <p role='alert' className='text-sm text-red-600'>{pdfError}</p>
+          )}
+        </div>
       </div>
 
 

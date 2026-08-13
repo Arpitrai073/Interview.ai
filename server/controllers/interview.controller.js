@@ -1,20 +1,37 @@
 import fs from "fs"
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { askAi } from "../services/openRouter.service.js";
+import { askAi, parseAiJson } from "../services/openRouter.service.js";
 import User from "../models/user.model.js";
 import Interview from "../models/interview.model.js";
+import ApiError from "../utils/ApiError.js";
 
-export const analyzeResume = async (req, res) => {
+const removeFile = async (filepath) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "Resume required" });
+    await fs.promises.unlink(filepath)
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.error(`Failed to delete uploaded file ${filepath}:`, error)
     }
-    const filepath = req.file.path
+  }
+}
 
+export const analyzeResume = async (req, res, next) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "Resume required" });
+  }
+
+  const filepath = req.file.path
+
+  try {
     const fileBuffer = await fs.promises.readFile(filepath)
     const uint8Array = new Uint8Array(fileBuffer)
 
-    const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+    let pdf
+    try {
+      pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+    } catch (error) {
+      throw new ApiError(400, "Could not read the PDF. Please upload a valid, unprotected resume PDF.", { cause: error })
+    }
 
     let resumeText = "";
 
@@ -31,6 +48,10 @@ export const analyzeResume = async (req, res) => {
     resumeText = resumeText
       .replace(/\s+/g, " ")
       .trim();
+
+    if (!resumeText) {
+      throw new ApiError(400, "No text could be extracted from this PDF. Please upload a text-based resume.")
+    }
 
     const messages = [
       {
@@ -57,12 +78,9 @@ Return strictly JSON:
 
     const aiResponse = await askAi(messages)
 
-    const parsed = JSON.parse(aiResponse);
+    const parsed = parseAiJson(aiResponse);
 
-    fs.unlinkSync(filepath)
-
-
-    res.json({
+    return res.json({
       role: parsed.role,
       experience: parsed.experience,
       projects: parsed.projects,
@@ -71,18 +89,14 @@ Return strictly JSON:
     });
 
   } catch (error) {
-    console.error(error);
-
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
-    return res.status(500).json({ message: error.message });
+    return next(error);
+  } finally {
+    await removeFile(filepath)
   }
 };
 
 
-export const generateQuestion = async (req, res) => {
+export const generateQuestion = async (req, res, next) => {
   try {
     let { role, experience, mode, resumeText, projects, skills } = req.body
 
@@ -174,14 +188,6 @@ Make questions based on the candidate’s role, experience,interviewMode, projec
 
     const aiResponse = await askAi(messages)
 
-    if (!aiResponse || !aiResponse.trim()) {
-           
-      return res.status(500).json({
-        message: "AI returned empty response."
-      });
-
-    }
-
     const questionsArray = aiResponse
       .split("\n")
       .map(q => q.trim())
@@ -189,46 +195,71 @@ Make questions based on the candidate’s role, experience,interviewMode, projec
       .slice(0, 5);
 
     if (questionsArray.length === 0) {
-      
-      return res.status(500).json({
-        message: "AI failed to generate questions."
-      });
+      throw new ApiError(502, "The AI service failed to generate questions. Please try again.")
     }
 
     user.credits -= 50;
     await user.save();
 
-    const interview = await Interview.create({
-      userId: user._id,
-      role,
-      experience,
-      mode,
-      resumeText: safeResume,
-      questions: questionsArray.map((q, index) => ({
-        question: q,
-        difficulty: ["easy", "easy", "medium", "medium", "hard"][index],
-        timeLimit: [60, 60, 90, 90, 120][index],
-      }))
-    })
+    let interview
+    try {
+      interview = await Interview.create({
+        userId: user._id,
+        role,
+        experience,
+        mode,
+        resumeText: safeResume,
+        questions: questionsArray.map((q, index) => ({
+          question: q,
+          difficulty: ["easy", "easy", "medium", "medium", "hard"][index],
+          timeLimit: [60, 60, 90, 90, 120][index],
+        }))
+      })
+    } catch (error) {
+      // Credits were already deducted, so give them back before failing.
+      await User.findByIdAndUpdate(user._id, { $inc: { credits: 50 } })
+      throw error
+    }
 
-    res.json({
+    return res.json({
       interviewId: interview._id,
       creditsLeft: user.credits,
       userName: user.name,
       questions: interview.questions
     });
   } catch (error) {
-    return res.status(500).json({message:`failed to create interview ${error}`})
+    return next(error)
   }
 }
 
 
-export const submitAnswer = async (req, res) => {
+export const submitAnswer = async (req, res, next) => {
   try {
     const { interviewId, questionIndex, answer, timeTaken } = req.body
 
+    if (!interviewId) {
+      throw new ApiError(400, "interviewId is required.")
+    }
+
+    if (!Number.isInteger(questionIndex) || questionIndex < 0) {
+      throw new ApiError(400, "questionIndex must be a non-negative integer.")
+    }
+
     const interview = await Interview.findById(interviewId)
+
+    if (!interview) {
+      throw new ApiError(404, "Interview not found.")
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      throw new ApiError(403, "You do not have access to this interview.")
+    }
+
     const question = interview.questions[questionIndex]
+
+    if (!question) {
+      throw new ApiError(400, "There is no question at that index.")
+    }
 
     // If no answer
     if (!answer) {
@@ -314,8 +345,7 @@ Answer: ${answer}
 
     const aiResponse = await askAi(messages)
 
-
-    const parsed = JSON.parse(aiResponse);
+    const parsed = parseAiJson(aiResponse);
 
     question.answer = answer;
     question.confidence = parsed.confidence;
@@ -328,18 +358,27 @@ Answer: ${answer}
 
     return res.status(200).json({feedback :parsed.feedback})
   } catch (error) {
-    return res.status(500).json({message:`failed to submit answer ${error}`})
-
+    return next(error)
   }
 }
 
 
-export const finishInterview = async (req,res) => {
+export const finishInterview = async (req,res,next) => {
   try {
     const {interviewId} = req.body
+
+    if(!interviewId){
+      throw new ApiError(400 , "interviewId is required.")
+    }
+
     const interview = await Interview.findById(interviewId)
+
     if(!interview){
-      return res.status(400).json({message:"failed to find Interview"})
+      throw new ApiError(404 , "Interview not found.")
+    }
+
+    if(interview.userId.toString() !== req.userId){
+      throw new ApiError(403 , "You do not have access to this interview.")
     }
 
     const totalQuestions = interview.questions.length;
@@ -392,12 +431,12 @@ export const finishInterview = async (req,res) => {
       })),
     })
   } catch (error) {
-    return res.status(500).json({message:`failed to finish Interview ${error}`})
+    return next(error)
   }
 }
 
 
-export const getMyInterviews = async (req,res) => {
+export const getMyInterviews = async (req,res,next) => {
   try {
     const interviews = await Interview.find({userId:req.userId})
     .sort({ createdAt: -1 })
@@ -406,16 +445,20 @@ export const getMyInterviews = async (req,res) => {
     return res.status(200).json(interviews)
 
   } catch (error) {
-     return res.status(500).json({message:`failed to find currentUser Interview ${error}`})
+     return next(error)
   }
 }
 
-export const getInterviewReport = async (req,res) => {
+export const getInterviewReport = async (req,res,next) => {
   try {
     const interview = await Interview.findById(req.params.id)
 
     if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
+      throw new ApiError(404, "Interview not found")
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      throw new ApiError(403, "You do not have access to this interview.")
     }
 
 
@@ -451,7 +494,7 @@ export const getInterviewReport = async (req,res) => {
     });
 
   } catch (error) {
-    return res.status(500).json({message:`failed to find currentUser Interview report ${error}`})
+    return next(error)
   }
 }
 

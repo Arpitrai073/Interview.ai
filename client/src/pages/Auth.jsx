@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { BsRobot } from "react-icons/bs";
 import { IoSparkles } from "react-icons/io5";
 import { motion } from "motion/react"
@@ -9,10 +9,15 @@ import axios from 'axios';
 import { ServerUrl } from '../App';
 import { useDispatch } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
+import { getErrorMessage } from '../utils/apiError';
 function Auth({isModel = false}) {
     const dispatch = useDispatch()
+    const [error, setError] = useState("")
+    const [loading, setLoading] = useState(false)
 
     const handleGoogleAuth = async () => {
+        setError("")
+        setLoading(true)
         try {
             const response = await signInWithPopup(auth,provider)
             let User = response.user
@@ -25,8 +30,16 @@ function Auth({isModel = false}) {
 
             
         } catch (error) {
-            console.log(error)
-              dispatch(setUserData(null))
+            console.error("Google sign in failed:", error)
+            dispatch(setUserData(null))
+
+            if (error?.code === "auth/popup-closed-by-user" || error?.code === "auth/cancelled-popup-request") {
+                setError("Sign in was cancelled.")
+            } else {
+                setError(getErrorMessage(error, "Sign in failed. Please try again."))
+            }
+        } finally {
+            setLoading(false)
         }
     }
   return (
@@ -66,13 +79,20 @@ function Auth({isModel = false}) {
             </p>
 
 
+            {error && (
+                <p role='alert' className='mb-4 text-sm text-center text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3'>
+                    {error}
+                </p>
+            )}
+
             <motion.button 
             onClick={handleGoogleAuth}
+            disabled={loading}
             whileHover={{opacity:0.9 , scale:1.03}}
             whileTap={{opacity:1 , scale:0.98}}
-            className='w-full flex items-center justify-center gap-3 py-3 bg-black text-white rounded-full shadow-md '>
+            className='w-full flex items-center justify-center gap-3 py-3 bg-black text-white rounded-full shadow-md disabled:opacity-60'>
                 <FcGoogle size={20}/>
-                Continue with Google
+                {loading ? "Signing in..." : "Continue with Google"}
 
    
             </motion.button>
